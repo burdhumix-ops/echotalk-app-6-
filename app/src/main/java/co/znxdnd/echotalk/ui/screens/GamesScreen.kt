@@ -49,6 +49,7 @@ import co.znxdnd.echotalk.ui.components.TournamentChessBoard
 import co.znxdnd.echotalk.utils.EchoHapticManager
 import co.znxdnd.echotalk.utils.PoliteSoundSynthesizer
 import co.znxdnd.echotalk.audio.AudioEffectManager
+import co.znxdnd.echotalk.audio.ChessSoundManager
 import androidx.compose.ui.platform.testTag
 import kotlin.random.Random
 import kotlinx.coroutines.delay
@@ -756,6 +757,7 @@ fun ChessGameView(
                         winner = "Black (Time)"
                         lastMoveText = "Time expired • Black wins"
                         haptic.performArcadeLoss(view)
+                        ChessSoundManager.getInstance(context).playGameEndSound(isWin = false)
                     }
                 } else {
                     blackTimeMs = (blackTimeMs - 1000L).coerceAtLeast(0L)
@@ -763,6 +765,7 @@ fun ChessGameView(
                         winner = "White (Time)"
                         lastMoveText = "Time expired • White wins"
                         haptic.performArcadeWin(view)
+                        ChessSoundManager.getInstance(context).playGameEndSound(isWin = true)
                     }
                 }
             }
@@ -923,9 +926,11 @@ fun ChessGameView(
             }
             PoliteSoundSynthesizer.playCaptureSound()
             AudioEffectManager.getInstance(context).playArcadeCaptureSound()
+            ChessSoundManager.getInstance(context).playCaptureSound()
         } else {
             PoliteSoundSynthesizer.playMoveChime()
             AudioEffectManager.getInstance(context).playArcadeMoveSound()
+            ChessSoundManager.getInstance(context).playMoveSound()
         }
 
         if (moveResult.isCheckmate) {
@@ -942,8 +947,13 @@ fun ChessGameView(
         lastMoveText = "${moveResult.moveNotation} • $nextTurn to move"
 
         haptic.performArcadeMove(view, isCapture = (capturedPiece != null))
-        if (winner == "White") haptic.performArcadeWin(view)
-        else if (winner == "Black") haptic.performArcadeLoss(view)
+        if (winner == "White") {
+            haptic.performArcadeWin(view)
+            ChessSoundManager.getInstance(context).playGameEndSound(isWin = true)
+        } else if (winner == "Black" || winner == "Draw") {
+            haptic.performArcadeLoss(view)
+            ChessSoundManager.getInstance(context).playGameEndSound(isWin = false)
+        }
 
         syncStateToFirestore(board, nextTurn, moveResult.moveNotation, winner, newCapWhite, newCapBlack, fromR, fromC, toR, toC)
 
@@ -986,15 +996,20 @@ fun ChessGameView(
                             capturedWhiteCodes = capturedWhiteCodes + aiResult.capturedPiece
                             PoliteSoundSynthesizer.playCaptureSound()
                             AudioEffectManager.getInstance(context).playArcadeCaptureSound()
+                            ChessSoundManager.getInstance(context).playCaptureSound()
                         } else {
                             PoliteSoundSynthesizer.playMoveChime()
                             AudioEffectManager.getInstance(context).playArcadeMoveSound()
+                            ChessSoundManager.getInstance(context).playMoveSound()
                         }
                         if (aiResult.isCheckmate) {
                             winner = "Black"
                             haptic.performArcadeLoss(view)
+                            ChessSoundManager.getInstance(context).playGameEndSound(isWin = false)
                         } else if (aiResult.isDraw) {
                             winner = "Draw"
+                            haptic.performArcadeLoss(view)
+                            ChessSoundManager.getInstance(context).playGameEndSound(isWin = false)
                         } else {
                             haptic.performArcadeMove(view, isCapture = (aiResult.capturedPiece != null))
                         }
