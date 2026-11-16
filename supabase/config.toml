@@ -1,0 +1,20 @@
+project_id = "echotalks"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+major_version = 15
+
+[auth]
+enabled = true
+enable_signup = true
+
+[functions.send-push-notification]
+verify_jwt = true
+
+[functions.livekit-token]
+verify_jwt = true

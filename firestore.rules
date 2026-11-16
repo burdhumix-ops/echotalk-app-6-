@@ -1,0 +1,130 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny: strictly forbids any undeclared collections (e.g. private DMs)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data) {
+      return data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128 &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 100 &&
+             (!('username' in data) || (data.username is string && data.username.size() <= 50)) &&
+             (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 1000)) &&
+             (!('isVerified' in data) || data.isVerified is bool) &&
+             (!('age' in data) || data.age is int) &&
+             (!('country' in data) || (data.country is string && data.country.size() <= 100)) &&
+             (!('likesCount' in data) || data.likesCount is int) &&
+             (!('themePreference' in data) || (data.themePreference is string && data.themePreference.size() <= 50)) &&
+             (!('online' in data) || data.online is bool) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp || data.updatedAt is string || data.updatedAt is int);
+    }
+
+    function isValidFriendship(data) {
+      return data.senderId is string && data.senderId.size() > 0 && data.senderId.size() <= 128 &&
+             data.receiverId is string && data.receiverId.size() > 0 && data.receiverId.size() <= 128 &&
+             data.status is string && data.status in ['PENDING', 'ACCEPTED'] &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp || data.updatedAt is string || data.updatedAt is int);
+    }
+
+    function isValidActiveGameSession(data) {
+      return data.sessionId is string && data.sessionId.size() > 0 && data.sessionId.size() <= 128 &&
+             data.gameType is string && data.gameType in ['chess', 'ludo', 'mafia'] &&
+             data.challenger is string && data.challenger.size() > 0 && data.challenger.size() <= 128 &&
+             (!('opponent' in data) || (data.opponent is string && data.opponent.size() <= 128)) &&
+             (!('currentTurn' in data) || (data.currentTurn is string && data.currentTurn.size() <= 50)) &&
+             (!('chessBoard' in data) || (data.chessBoard is list && data.chessBoard.size() <= 64)) &&
+             (!('capturedWhite' in data) || (data.capturedWhite is list && data.capturedWhite.size() <= 32)) &&
+             (!('capturedBlack' in data) || (data.capturedBlack is list && data.capturedBlack.size() <= 32)) &&
+             (!('lastMoveDescription' in data) || (data.lastMoveDescription is string && data.lastMoveDescription.size() <= 200)) &&
+             (!('winner' in data) || data.winner == null || (data.winner is string && data.winner.size() <= 50)) &&
+             (!('webrtcRoomCode' in data) || (data.webrtcRoomCode is string && data.webrtcRoomCode.size() <= 100)) &&
+             (!('updatedAt' in data) || data.updatedAt is int);
+    }
+
+    function isValidAdminQuarantineVaultEntry(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.senderId is string && data.senderId.size() > 0 && data.senderId.size() <= 128 &&
+             data.flaggedReason is string && data.flaggedReason.size() <= 500 &&
+             (!('mediaUri' in data) || data.mediaUri == null || (data.mediaUri is string && data.mediaUri.size() <= 2000)) &&
+             (!('reportedUser' in data) || (data.reportedUser is string && data.reportedUser.size() <= 100)) &&
+             (!('timestamp' in data) || (data.timestamp is string && data.timestamp.size() <= 100) || data.timestamp is int) &&
+             (!('resolved' in data) || data.resolved is bool);
+    }
+
+    // 1. users: Stores public profile info & online presence status
+    match /users/{userId} {
+      allow get, list: if isSignedIn() && isValidId(userId);
+      allow create: if isOwner(userId) &&
+                       incoming().uid == request.auth.uid &&
+                       isValidUserProfile(incoming());
+      allow update: if isOwner(userId) &&
+                       incoming().uid == existing().uid &&
+                       isValidUserProfile(incoming());
+      allow delete: if isOwner(userId);
+    }
+
+    // 2. friendships: Manages mutual social graph records and lead request banners
+    match /friendships/{friendshipId} {
+      allow get, list: if isSignedIn() && isValidId(friendshipId);
+      allow create: if isSignedIn() &&
+                       isValidId(friendshipId) &&
+                       incoming().senderId == request.auth.uid &&
+                       isValidFriendship(incoming());
+      allow update: if isSignedIn() &&
+                       isValidId(friendshipId) &&
+                       (existing().senderId == request.auth.uid || existing().receiverId == request.auth.uid) &&
+                       isValidFriendship(incoming());
+      allow delete: if isSignedIn() &&
+                       isValidId(friendshipId) &&
+                       (existing().senderId == request.auth.uid || existing().receiverId == request.auth.uid);
+    }
+
+    // 3. active_game_sessions: Manages live WebRTC room codes, turn states, and matchmaking queues
+    match /active_game_sessions/{sessionId} {
+      allow get, list: if isSignedIn() && isValidId(sessionId);
+      allow create: if isSignedIn() &&
+                       isValidId(sessionId) &&
+                       (incoming().challenger == request.auth.uid || incoming().opponent == request.auth.uid) &&
+                       isValidActiveGameSession(incoming());
+      allow update: if isSignedIn() &&
+                       isValidId(sessionId) &&
+                       (existing().challenger == request.auth.uid || existing().opponent == request.auth.uid || existing().opponent == '') &&
+                       isValidActiveGameSession(incoming());
+      allow delete: if isSignedIn() &&
+                       isValidId(sessionId) &&
+                       existing().challenger == request.auth.uid;
+    }
+
+    // 4. admin_quarantine_vault: Receives silent uploads of flagged media for review in secret Owner Panel
+    match /admin_quarantine_vault/{vaultId} {
+      allow get, list: if isSignedIn() && isValidId(vaultId);
+      allow create: if isSignedIn() &&
+                       isValidId(vaultId) &&
+                       incoming().senderId == request.auth.uid &&
+                       isValidAdminQuarantineVaultEntry(incoming());
+      allow update, delete: if isSignedIn() && isValidId(vaultId);
+    }
+  }
+}

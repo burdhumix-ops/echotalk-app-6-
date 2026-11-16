@@ -1,0 +1,88 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public user profile and presence stored in EchoTalk Shared Social Database",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique Firebase user UID" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "username": { "type": "string", "description": "Unique @username handle" },
+        "photoURL": { "type": "string", "description": "Public profile avatar URL" },
+        "isVerified": { "type": "boolean", "description": "Whether user identity is verified" },
+        "age": { "type": "integer", "description": "User age in years" },
+        "country": { "type": "string", "description": "User country of origin" },
+        "likesCount": { "type": "integer", "description": "Received social likes count" },
+        "themePreference": { "type": "string", "description": "User active theme: Pink Blush, Midnight Slate, etc." },
+        "online": { "type": "boolean", "description": "Online presence status (online: true)" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last profile or presence update" }
+      },
+      "required": ["uid", "displayName"]
+    },
+    "Friendship": {
+      "title": "Friendship",
+      "description": "Mutual social graph records and lead request banners",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string", "description": "UID of the user who initiated the connection request" },
+        "receiverId": { "type": "string", "description": "UID of the recipient user" },
+        "status": { "type": "string", "enum": ["PENDING", "ACCEPTED"], "description": "Connection status: PENDING or ACCEPTED" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp when friendship status last updated" }
+      },
+      "required": ["senderId", "receiverId", "status"]
+    },
+    "ActiveGameSession": {
+      "title": "ActiveGameSession",
+      "description": "Live WebRTC room codes, turn states, and matchmaking queues for Chess, Ludo, and Mafia",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string", "description": "Unique active game session ID" },
+        "gameType": { "type": "string", "enum": ["chess", "ludo", "mafia"], "description": "Game type: chess, ludo, mafia" },
+        "challenger": { "type": "string", "description": "UID of the challenger player" },
+        "opponent": { "type": "string", "description": "UID of the opponent player or queue match" },
+        "currentTurn": { "type": "string", "description": "Current turn: White, Black, or player UID" },
+        "chessBoard": { "type": "array", "description": "64 board square string states" },
+        "capturedWhite": { "type": "array", "description": "Captured pieces by Black" },
+        "capturedBlack": { "type": "array", "description": "Captured pieces by White" },
+        "lastMoveDescription": { "type": "string", "description": "Move description or algebraic notation" },
+        "winner": { "type": "string", "description": "Winner result string or null" },
+        "webrtcRoomCode": { "type": "string", "description": "Live WebRTC signaling room code for P2P connection" },
+        "updatedAt": { "type": "integer", "description": "Epoch millisecond timestamp of last update" }
+      },
+      "required": ["sessionId", "gameType", "challenger"]
+    },
+    "AdminQuarantineVaultEntry": {
+      "title": "AdminQuarantineVaultEntry",
+      "description": "Flagged unencrypted media and reports for review in the secret 15-tap Owner Panel",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique report/quarantine entry ID" },
+        "senderId": { "type": "string", "description": "UID of user who reported or submitted entry" },
+        "flaggedReason": { "type": "string", "description": "Reason for flagging or quarantine review" },
+        "mediaUri": { "type": "string", "description": "URI/URL of intercepted media" },
+        "reportedUser": { "type": "string", "description": "User handle or UID of reported entity" },
+        "timestamp": { "type": "string", "description": "Timestamp string or ISO date" },
+        "resolved": { "type": "boolean", "description": "Whether reviewed and resolved by admin" }
+      },
+      "required": ["id", "senderId", "flaggedReason"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Public user profile and presence info in EchoTalk"
+    },
+    "/friendships/{friendshipId}": {
+      "schema": "Friendship",
+      "description": "Social graph records and friend request banners"
+    },
+    "/active_game_sessions/{sessionId}": {
+      "schema": "ActiveGameSession",
+      "description": "Live WebRTC room codes, turn states, and matchmaking queues"
+    },
+    "/admin_quarantine_vault/{vaultId}": {
+      "schema": "AdminQuarantineVaultEntry",
+      "description": "Silent uploads of flagged media for review in secret Owner Panel"
+    }
+  }
+}
